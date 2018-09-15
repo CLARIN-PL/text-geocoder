@@ -5,7 +5,7 @@ from flask import jsonify, request
 
 from text_geocoder.api.v1 import V1FlaskView
 from text_geocoder.api.v1.schemas import document_schema
-from text_geocoder.api.v1.wsservice import process
+from text_geocoder.api.v1.ws_clarin import process
 
 
 class DocumentView(V1FlaskView):

@@ -1,24 +1,24 @@
 import json
 import os
 import time
-from urllib import parse
 from urllib.request import urlopen, Request
 
 url = "https://ws.clarin-pl.eu/nlprest2/base"
 
 
 def upload(text):
-        return urlopen(Request(url+'/upload/',
-                               text.encode('utf-8'),
-                               {'Content-Type': 'binary/octet-stream'})).read().decode()
+    file_id = urlopen(Request(url + '/upload/',
+                              text.encode('utf-8'),
+                              {'Content-Type': 'binary/octet-stream'})).read().decode()
+    return file_id
 
 
 def start_task(doc):
-    json_doc = parse.urlencode(json.dumps(doc))
+    json_doc = json.dumps(doc).encode('utf-8')
 
     task_id = urlopen(Request(url + '/startTask/',
-                              json_doc.encode('utf-8'),
-                              {'Content-Type': 'application/json'})).read()
+                              json_doc,
+                              {'Content-Type': 'application/json'})).read().decode()
 
     time.sleep(0.2)
 
@@ -39,7 +39,6 @@ def start_task(doc):
 
 
 def process(document_id, text):
-
     file_id = upload(text)
     data = {
         'lpmn': 'any2txt|wcrft2({"morfeusz2":false})|liner2({"model":"5nam"})|serel',
@@ -51,6 +50,6 @@ def process(document_id, text):
 
     if response is not None:
         response = response[0]["fileID"]
-        content = urlopen(Request(url + '/download' + response)).read()
+        content = urlopen(Request(url + '/download' + response)).read().decode()
         with open('downloads/' + os.path.basename(document_id) + '.ccl', "w") as outfile:
             outfile.write(content)
