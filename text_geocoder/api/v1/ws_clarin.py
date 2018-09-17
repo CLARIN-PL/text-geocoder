@@ -39,9 +39,16 @@ def start_task(doc):
 
 
 def process(document_id, text):
+    """
+    Processes text by using clarin services
+    :param document_id: uuid
+    :param text: string
+    :return: result file path
+    """
+
     file_id = upload(text)
     data = {
-        'lpmn': 'any2txt|wcrft2({"morfeusz2":false})|liner2({"model":"5nam"})|serel',
+        'lpmn': 'any2txt|wcrft2({"morfeusz2":false})|liner2({"model":"n82"})|serel',
         'user': 'geocoder',
         'file': file_id
     }
@@ -53,3 +60,4 @@ def process(document_id, text):
         content = urlopen(Request(url + '/download' + response)).read().decode()
         with open('downloads/' + os.path.basename(document_id) + '.ccl', "w") as outfile:
             outfile.write(content)
+    return 'downloads/' + os.path.basename(document_id) + '.ccl'

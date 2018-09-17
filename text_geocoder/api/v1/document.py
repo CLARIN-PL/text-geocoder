@@ -4,6 +4,8 @@ import uuid
 from flask import jsonify, request
 
 from text_geocoder.api.v1 import V1FlaskView
+from text_geocoder.api.v1.ccl_parser import extract_locations
+from text_geocoder.api.v1.geocoder import find_latitude_and_longitude
 from text_geocoder.api.v1.schemas import document_schema
 from text_geocoder.api.v1.ws_clarin import process
 
@@ -30,12 +32,17 @@ class DocumentView(V1FlaskView):
 
         document__id = str(uuid.uuid4())
 
-        process(document__id, data['text'])
+        result_file_path = process(document__id, data['text'])
+
+        locations = extract_locations(result_file_path)
+
+        locations = find_latitude_and_longitude(locations)
 
         response = {
             'id': document__id,
             'text': data['text'],
-            'created_on': datetime.datetime.now()
+            'created_on': datetime.datetime.now(),
+            'locations': locations
         }
 
         return jsonify(response), 200
