@@ -38,9 +38,10 @@ def start_task(doc):
     return data["value"]
 
 
-def process(document_id, text):
+def process(document_id, text, model):
     """
     Processes text by using clarin services
+    :param model: liner2 model name
     :param document_id: uuid
     :param text: string
     :return: result file path
@@ -48,7 +49,7 @@ def process(document_id, text):
 
     file_id = upload(text)
     data = {
-        'lpmn': 'any2txt|wcrft2({"morfeusz2":false})|liner2({"model":"n82"})|serel',
+        'lpmn': 'any2txt|wcrft2({"morfeusz2":false})|liner2({"model":"'+model+'"})',
         'user': 'geocoder',
         'file': file_id
     }

@@ -32,9 +32,14 @@ class DocumentView(V1FlaskView):
 
         document__id = str(uuid.uuid4())
 
-        result_file_path = process(document__id, data['text'])
+        # n82 — rozpoznaje 82 kategorii nazw własnych
+        # top9 — rozpoznaje 9 kategorii nazw własnych
+        # 5nam - rozpoznaje 5 kategorii nazw własnych (imiona, nazwiska, nazwy państwa, miast i ulic)
+        model = 'n82'
 
-        locations = extract_locations(result_file_path)
+        result_file_path = process(document__id, data['text'], model)
+
+        locations = extract_locations(result_file_path, model)
 
         locations = find_latitude_and_longitude(locations)
 
