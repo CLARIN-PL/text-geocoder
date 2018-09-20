@@ -1,6 +1,9 @@
+import pickle
+
 from geopy import Nominatim, GeoNames
 
 from text_geocoder.api.v1.ccl_parser import attributes
+from text_geocoder.extensions import redis_store
 
 nominatim = Nominatim(user_agent="ws_clarin_geolocation")
 geo_name = GeoNames(username='clarinpl')
@@ -40,7 +43,18 @@ class Result:
         self.succeeded = succeeded
 
 
+class ResultData(Result, Messenger):
+
+    def __init__(self, data):
+        self.data = data
+
+    def __str__(self): return str(self.data)
+
+
 class Strategy:
+
+    def __init__(self):
+        self.result = ResultData([])
 
     def __call__(self, messenger):
         pass
@@ -49,11 +63,30 @@ class Strategy:
         return "Trying " + self.__class__.__name__ \
           + " algorithm"
 
+    def get_from_cache(self, a):
+        key = a['orth'] + '_' + a['base'] + '_' + a['chan']
+        val = redis_store.get(key)
+        if val:
+            self.result.set_successful(1)
+            print('Found in store')
+            print(val)
+            return val
+
+        return None
+
+    def save_to_cache(self, a, loc):
+        key = a['orth'] + '_' + a['base'] + '_' + a['chan']
+        dump = pickle.dump(loc)
+        redis_store.set(key, dump)
+
     def apply_location(self, a, loc):
         if loc is not None:
-            a['latitude'] = loc.latitude
-            a['longitude'] = loc.longitude
-            a['address'] = loc.address
+            item = {'latitude': loc.latitude,
+                    'longitude': loc.longitude,
+                    'address':  loc.address}
+
+            self.save_to_cache(a, loc)
+            a['locations'].append(item)
 
 
 # Manage the movement through the chain and
@@ -81,18 +114,14 @@ class ChainLink:
         return self.next()(messenger)
 
 
-class AnnotationData(Result, Messenger):
-
-    def __init__(self, data):
-        self.data = data
-
-    def __str__(self): return str(self.data)
-
-
 class ResolveStreet(Strategy):
     def __call__(self, messenger):
         a, scope = messenger
-        result = AnnotationData([])  # Dummy data
+
+        cached = self.get_from_cache(a)
+        if cached is not None:
+            return self.result
+
         if a['chan'] == attributes['n82']['street']:
             cities = []
             house_numbers = []
@@ -103,72 +132,77 @@ class ResolveStreet(Strategy):
                 if ann['chan'] == attributes['n82']['house_number']:
                     house_numbers.append(ann['base'])
 
-            if len(cities) == 1 and len(house_numbers) == 1:
-                street = house_numbers[0] + ' ' + a['base']
-                loc = nominatim.geocode({'city': cities[0], 'street': street}, language='pl')
-                if not loc:
-                    street = house_numbers[0] + ' ' + a['orth']
-                    loc = nominatim.geocode({'city': cities[0], 'street': street}, language='pl')
-                if not loc:
-                    result.set_successful(0)
-                else:
-                    self.apply_location(a, loc)
-                    result.set_successful(1)
-        result.set_successful(0)
-        return result
+            for c in cities:
+                for hn in house_numbers:
+                    street = hn + ' ' + a['base']
+                    loc = nominatim.geocode({'city': c, 'street': street}, language='pl')
+                    if not loc:
+                        street = hn + ' ' + a['orth']
+                        loc = nominatim.geocode({'city': c, 'street': street}, language='pl')
+                    if loc:
+                        self.apply_location(a, loc)
+                        self.result.set_successful(1)
+        self.result.set_successful(0)
+        return self.result
 
 
 class ResolveCity(Strategy):
     def __call__(self, messenger):
         a, scope = messenger
-        result = AnnotationData([])  # Dummy data
+
+        cached = self.get_from_cache(a)
+        if cached is not None:
+            return self.result
+
         if a['chan'] == attributes['n82']['city']:
             loc = nominatim.geocode({'city': a['base']}, language='pl')
             if not loc:
                 loc = nominatim.geocode({'city': a['orth']}, language='pl')
 
-            if not loc:
-                result.set_successful(0)
-            else:
+            if loc:
                 self.apply_location(a, loc)
-                result.set_successful(1)
-        else:
-            result.set_successful(0)
+                self.result.set_successful(1)
 
-        return result
+        self.result.set_successful(0)
+        return self.result
 
 
 class ResolveCountry(Strategy):
     def __call__(self, messenger):
         a, scope = messenger
-        result = AnnotationData([])  # Dummy data
+
+        cached = self.get_from_cache(a)
+        if cached is not None:
+            return self.result
+
         if a['chan'] == attributes['n82']['city']:
             loc = nominatim.geocode({'country': a['base']}, language='pl')
             if not loc:
                 loc = nominatim.geocode({'country': a['orth']}, language='pl')
 
-            if not loc:
-                result.set_successful(0)
-            else:
+            if loc:
                 self.apply_location(a, loc)
-                result.set_successful(1)
-        else:
-            result.set_successful(0)
-        return result
+                self.result.set_successful(1)
+
+        self.result.set_successful(0)
+        return self.result
 
 
 class ResolveLocation(Strategy):
     def __call__(self, messenger):
         a, scope = messenger
 
-        if a['chan'] != 'nam_num_house':
+        cached = self.get_from_cache(a)
+        if cached is not None:
+            return self.result
+
+        if a['chan'] != 'nam_num' and a['chan'] != 'nam_num_house':
             loc = nominatim.geocode(a['base'], language='pl')
             if not loc:
                 loc = nominatim.geocode(a['orth'], language='pl')
 
             self.apply_location(a, loc)
 
-        result = AnnotationData([])
-        result.set_successful(1)
-        return result
+        self.result.set_successful(1)
+        return self.result
 

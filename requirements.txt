@@ -17,3 +17,4 @@ marshmallow==2.15.*
 
 # Additional libraries
 geopy==1.17.0
+Flask-Redis==0.3.0

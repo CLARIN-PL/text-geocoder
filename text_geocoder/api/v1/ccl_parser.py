@@ -3,10 +3,10 @@ from operator import itemgetter
 from xml.etree import ElementTree
 
 attributes = {
-        'nam9': {
+        'top9': {
             'location': 'nam_loc',
             'facility': 'nam_fac',
-            'nam_num': 'nam_fac',
+            'number': 'nam_num',
         },
         'n82': {
             'city': 'nam_loc_gpe_city',
@@ -46,7 +46,7 @@ def extract_locations(file_path, model):
     current_orth = ''
     current_base = ''
     current_sentence = ''
-
+    ann_id = 1
     for event, elem in xml_iter:
         if event == 'start':
             if elem.tag == 'sentence' and elem.tag != '' and current_sentence != elem.attrib['id']:
@@ -54,16 +54,20 @@ def extract_locations(file_path, model):
                     annotations.append({'id': current_sentence, 'ann': []})
 
             if elem.tag == 'orth' and elem.tag != '':
+                ann_id += 1
                 current_orth = elem.text
 
             if elem.tag == 'base' and elem.tag != '':
                     current_base = elem.text
 
             if elem.tag == 'ann' and elem.attrib['chan'] in attributes[model].values() and elem.text != '0':
-                item = {'orth': current_orth,
+                item = {'id': ann_id,
+                        'orth': current_orth,
                         'base': current_base,
                         'chan': elem.attrib['chan'],
-                        'chan_val': elem.text}
+                        'chan_val': elem.text,
+                        'locations': []
+                        }
                 i = next(item for item in annotations if item["id"] == current_sentence)
                 i.get('ann').append(item)
 

@@ -33,14 +33,15 @@ def start_task(doc):
 
     if data["status"] == "ERROR":
         print("Error " + data["value"])
-        return None
+        return None, data['value']
 
-    return data["value"]
+    return data["value"], None
 
 
-def process(document_id, text, model):
+async def process(document_id, text, model, out='downloads/'):
     """
     Processes text by using clarin services
+    :param out: path to output directory
     :param model: liner2 model name
     :param document_id: uuid
     :param text: string
@@ -54,11 +55,17 @@ def process(document_id, text, model):
         'file': file_id
     }
 
-    response = start_task(data)
+    response, errors = start_task(data)
+
+    if errors is not None:
+        return {'errors': errors}
 
     if response is not None:
         response = response[0]["fileID"]
         content = urlopen(Request(url + '/download' + response)).read().decode()
-        with open('downloads/' + os.path.basename(document_id) + '.ccl', "w") as outfile:
+        with open(out + os.path.basename(document_id) + '.' + model, "w") as outfile:
             outfile.write(content)
-    return 'downloads/' + os.path.basename(document_id) + '.ccl'
+
+    return {'model': model,
+            'path': out + os.path.basename(document_id) + '.' + model,
+            'errors': None}

@@ -5,9 +5,22 @@ services:
     build: .
     command: >
       gunicorn -c "python:config.gunicorn" --reload "text_geocoder.app:create_app()"
+    depends_on:
+      - redis
     env_file:
       - ".env"
     ports:
       - "8000:8000"
     volumes:
       - ".:/app"
+  redis:
+    image: redis:3.2-alpine
+    command: redis-server --requirepass devpassword
+    volumes:
+      - 'redis:/var/lib/redis/data'
+    ports:
+      - '6379:6379'
+
+volumes:
+  redis:
+
