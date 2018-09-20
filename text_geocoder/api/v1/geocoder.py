@@ -65,18 +65,18 @@ class Strategy:
 
     def get_from_cache(self, a):
         key = a['orth'] + '_' + a['base'] + '_' + a['chan']
-        val = redis_store.get(key)
-        if val:
+        restored_val = redis_store.get(key)
+        if restored_val:
+            val = pickle.loads(restored_val)
+            a['locations'].append(val)
             self.result.set_successful(1)
-            print('Found in store')
-            print(val)
             return val
 
         return None
 
     def save_to_cache(self, a, loc):
         key = a['orth'] + '_' + a['base'] + '_' + a['chan']
-        dump = pickle.dump(loc)
+        dump = pickle.dumps(loc)
         redis_store.set(key, dump)
 
     def apply_location(self, a, loc):
@@ -85,7 +85,7 @@ class Strategy:
                     'longitude': loc.longitude,
                     'address':  loc.address}
 
-            self.save_to_cache(a, loc)
+            self.save_to_cache(a, item)
             a['locations'].append(item)
 
 
@@ -119,6 +119,7 @@ class ResolveStreet(Strategy):
         a, scope = messenger
 
         cached = self.get_from_cache(a)
+
         if cached is not None:
             return self.result
 
