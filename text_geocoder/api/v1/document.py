@@ -34,7 +34,7 @@ class DocumentView(V1FlaskView):
 
         document__id = str(uuid.uuid4())
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
 
         try:
             finished_tasks = loop.run_until_complete(execute_tasks(document__id, data['text']))
@@ -79,12 +79,13 @@ async def execute_tasks(document__id, text):
         run_process_task(document__id, text, 'n82'),
         run_process_task(document__id, text, 'top9')
     ]
-
+    done = None
     while len(tasks):
         done, tasks = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for task in done:
             if task.result()['errors']:
                 raise WebServiceError(task.result()['errors'])
+
     return done
 
 
