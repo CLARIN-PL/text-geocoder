@@ -1,6 +1,6 @@
 import pickle
 
-from geopy import Nominatim, GeoNames
+from geopy import Nominatim, GeoNames, GoogleV3
 
 from text_geocoder.api.v1.ccl_parser import attributes
 from text_geocoder.extensions import redis_store
@@ -66,7 +66,7 @@ class Strategy:
     def get_from_cache(self, a):
         key = a['orth'] + '_' + a['base'] + '_' + a['chan']
         restored_val = redis_store.get(key)
-        if restored_val:
+        if restored_val is not None:
             val = pickle.loads(restored_val)
             a['locations'].append(val)
             self.result.set_successful(1)
@@ -116,6 +116,7 @@ class ChainLink:
 
 class ResolveStreet(Strategy):
     def __call__(self, messenger):
+        self.result.set_successful(0)
         a, scope = messenger
 
         cached = self.get_from_cache(a)
@@ -126,6 +127,7 @@ class ResolveStreet(Strategy):
         if a['chan'] == attributes['n82']['street']:
             cities = []
             house_numbers = []
+            street = a['base']
 
             for ann in scope['ann']:
                 if ann['chan'] == attributes['n82']['city']:
@@ -134,24 +136,37 @@ class ResolveStreet(Strategy):
                     house_numbers.append(ann['base'])
 
             for c in cities:
-                for hn in house_numbers:
-                    street = hn + ' ' + a['base']
+
+                if len(house_numbers) == 0:
+
                     loc = nominatim.geocode({'city': c, 'street': street}, language='pl')
                     if not loc:
-                        street = hn + ' ' + a['orth']
+                        street = a['orth']
                         loc = nominatim.geocode({'city': c, 'street': street}, language='pl')
                     if loc:
                         self.apply_location(a, loc)
                         self.result.set_successful(1)
-        self.result.set_successful(0)
+                else:
+                    for hn in house_numbers:
+                        street = hn + ' ' + street
+                        loc = nominatim.geocode({'city': c, 'street': street}, language='pl')
+                        if not loc:
+                            street = hn + ' ' + a['orth']
+                            loc = nominatim.geocode({'city': c, 'street': street}, language='pl')
+                        if loc:
+                            self.apply_location(a, loc)
+                            self.result.set_successful(1)
+
         return self.result
 
 
 class ResolveCity(Strategy):
     def __call__(self, messenger):
+        self.result.set_successful(0)
         a, scope = messenger
 
         cached = self.get_from_cache(a)
+
         if cached is not None:
             return self.result
 
@@ -164,12 +179,12 @@ class ResolveCity(Strategy):
                 self.apply_location(a, loc)
                 self.result.set_successful(1)
 
-        self.result.set_successful(0)
         return self.result
 
 
 class ResolveCountry(Strategy):
     def __call__(self, messenger):
+        self.result.set_successful(0)
         a, scope = messenger
 
         cached = self.get_from_cache(a)
@@ -185,12 +200,12 @@ class ResolveCountry(Strategy):
                 self.apply_location(a, loc)
                 self.result.set_successful(1)
 
-        self.result.set_successful(0)
         return self.result
 
 
 class ResolveLocation(Strategy):
     def __call__(self, messenger):
+        self.result.set_successful(0)
         a, scope = messenger
 
         cached = self.get_from_cache(a)
